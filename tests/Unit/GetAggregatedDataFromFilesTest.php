@@ -87,14 +87,42 @@ final class GetAggregatedDataFromFilesTest extends TestCase
 
 
     /**
+     * @throws JsonException
+     * @throws ReflectionException
+     */
+    public function testSkipsProfilesThatHoldNoData(): void
+    {
+        $files = [
+            $this->writeFile('empty.json', 'null'),
+            $this->writeFile('cut-off.json', '{"main()": {"ct": 1,'),
+            $this->writeProfile('first.json', self::FIRST_RUN),
+        ];
+
+        self::assertSame(
+            [
+                'main()' => ['ct' => 1, 'wt' => 150, 'excl_wt' => 50, 'excl_cpu' => 30, 'excl_mu' => 500, 'runs' => 1],
+                'a' => ['ct' => 1, 'wt' => 100, 'excl_wt' => 100, 'excl_cpu' => 60, 'excl_mu' => 1000, 'runs' => 1],
+            ],
+            $this->callGetAggregatedDataFromFiles($files),
+        );
+    }
+
+
+    /**
      * @param array<string, array{ct: int, wt: int, cpu: int, mu: int, pmu: int}> $profile
      *
      * @throws JsonException
      */
     private function writeProfile(string $name, array $profile): string
     {
+        return $this->writeFile($name, json_encode($profile, JSON_THROW_ON_ERROR));
+    }
+
+
+    private function writeFile(string $name, string $contents): string
+    {
         $file = $this->profilesDir . $name;
-        file_put_contents($file, json_encode($profile, JSON_THROW_ON_ERROR));
+        file_put_contents($file, $contents);
 
         return $file;
     }

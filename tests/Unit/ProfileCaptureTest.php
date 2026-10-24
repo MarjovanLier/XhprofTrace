@@ -8,14 +8,18 @@ use JsonException;
 use MarjovanLier\XhprofTrace\Trace;
 use Override;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+use ReflectionException;
 
 /**
  * Runs the real xhprof extension, so it needs ext-xhprof loaded.
  *
  * @internal
  *
+ * @covers \MarjovanLier\XhprofTrace\Trace::createProfilesDir
  * @covers \MarjovanLier\XhprofTrace\Trace::disableXhprof
  * @covers \MarjovanLier\XhprofTrace\Trace::enableXhprof
+ * @covers \MarjovanLier\XhprofTrace\Trace::setProfilesDir
  */
 final class ProfileCaptureTest extends TestCase
 {
@@ -44,8 +48,14 @@ final class ProfileCaptureTest extends TestCase
     {
         chdir($this->previousDir);
 
-        $this->removeDirectory($this->profilesDir . 'cwd/');
         $this->removeDirectory($this->profilesDir);
+
+        // A mutant that drops the closing slash saves beside the folder instead of in it.
+        $besideFolder = glob(rtrim($this->profilesDir, '/') . '*.application.json');
+
+        foreach (is_array($besideFolder) ? $besideFolder : [] as $file) {
+            unlink($file);
+        }
 
         parent::tearDown();
     }
@@ -61,7 +71,7 @@ final class ProfileCaptureTest extends TestCase
         Trace::enableXhprof();
         Trace::disableXhprof();
 
-        $files = $this->profileFiles();
+        $files = $this->profileFiles($this->profilesDir);
 
         self::assertCount(2, $files);
 
@@ -80,7 +90,7 @@ final class ProfileCaptureTest extends TestCase
         usleep(1);
         Trace::disableXhprof();
 
-        [$file] = $this->profileFiles();
+        [$file] = $this->profileFiles($this->profilesDir);
 
         /**
          * @var array<string, array<string, int>> $profile
@@ -103,18 +113,98 @@ final class ProfileCaptureTest extends TestCase
 
 
     /**
+     * @throws JsonException
+     */
+    public function testSavesIntoAFolderThatDoesNotExistYet(): void
+    {
+        $folder = $this->profilesDir . 'new/deeper/';
+        Trace::setProfilesDir($folder);
+
+        Trace::enableXhprof();
+        Trace::disableXhprof();
+
+        self::assertCount(1, $this->profileFiles($folder));
+    }
+
+
+    /**
+     * @throws JsonException
+     */
+    public function testSavesInsideAFolderGivenWithoutTrailingSlash(): void
+    {
+        Trace::setProfilesDir(rtrim($this->profilesDir, '/'));
+
+        Trace::enableXhprof();
+        Trace::disableXhprof();
+
+        self::assertCount(1, $this->profileFiles($this->profilesDir));
+    }
+
+
+    /**
+     * @throws JsonException
+     */
+    public function testEmptyFolderMeansTheCurrentFolder(): void
+    {
+        Trace::setProfilesDir('');
+
+        Trace::enableXhprof();
+        Trace::disableXhprof();
+
+        self::assertCount(1, $this->profileFiles($this->profilesDir . 'cwd/'));
+    }
+
+
+    /**
+     * @throws ReflectionException
+     */
+    public function testCreatingAFolderThatAnotherProcessJustMadeRaisesNoWarning(): void
+    {
+        $warnings = [];
+        set_error_handler(static function (int $level, string $message) use (&$warnings): bool {
+            $warnings[] = [$level, $message];
+
+            return true;
+        });
+
+        try {
+            // The folder already exists, as when a second process created it a moment earlier.
+            (new ReflectionClass(Trace::class))->getMethod('createProfilesDir')->invoke(null);
+
+            // This one must still reach the handler above, so the method put back the handler it replaced.
+            trigger_error('after', E_USER_WARNING);
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertSame([[E_USER_WARNING, 'after']], $warnings);
+    }
+
+
+    /**
+     * @throws JsonException
+     */
+    public function testDisableWithoutEnableSavesNothing(): void
+    {
+        Trace::disableXhprof();
+
+        self::assertSame([], $this->profileFiles($this->profilesDir));
+    }
+
+
+    /**
      * @return array<int, string>
      */
-    private function profileFiles(): array
+    private function profileFiles(string $folder): array
     {
-        $files = glob($this->profilesDir . '*.json');
+        $files = glob($folder . '*.json');
 
         return is_array($files) ? $files : [];
     }
 
 
     /**
-     * Removes every file in the directory, then the directory.
+     * Removes everything in the directory, then the directory.
      *
      * A glob would miss the names a mutant can write (no ".json" ending, or a leading dot).
      */
@@ -123,7 +213,15 @@ final class ProfileCaptureTest extends TestCase
         $entries = scandir($directory);
 
         foreach (is_array($entries) ? array_diff($entries, ['.', '..']) : [] as $entry) {
-            unlink($directory . $entry);
+            $path = $directory . $entry;
+
+            if (is_dir($path)) {
+                $this->removeDirectory($path . '/');
+
+                continue;
+            }
+
+            unlink($path);
         }
 
         rmdir($directory);

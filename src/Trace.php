@@ -53,7 +53,12 @@ final class Trace
      */
     public static function setProfilesDir(string $path): void
     {
-        self::$profilesDir = $path;
+        // The file name is appended to this path, so without a closing slash it would land beside the folder.
+        self::$profilesDir = match (true) {
+            $path === '' => './',
+            str_ends_with($path, '/') => $path,
+            default => $path . '/',
+        };
     }
 
 
@@ -85,6 +90,17 @@ final class Trace
         // Stop first, so the calls that build the file name are not in the profile.
         $profile = xhprof_disable();
 
+        // xhprof returns null when profiling was never enabled, although its stubs say array;
+        // a file for that call would only hold "null".
+        /** @psalm-suppress TypeDoesNotContainNull */
+        if ($profile === null) { // @phpstan-ignore identical.alwaysFalse
+            return;
+        }
+
+        if (!is_dir(self::$profilesDir)) {
+            self::createProfilesDir();
+        }
+
         // The random part keeps two runs in the same second from writing to the same file.
         $filename = self::$profilesDir . time() . '.' . bin2hex(random_bytes(8)) . '.application.json';
         file_put_contents($filename, json_encode($profile, JSON_THROW_ON_ERROR));
@@ -92,12 +108,25 @@ final class Trace
 
 
     /**
+     * Creates the profiles directory.
+     *
+     * Two processes can find the directory missing at the same moment. The one that loses the race gets a
+     * "File exists" warning from mkdir(), which frameworks often turn into an exception; that warning alone
+     * is ignored. Any other failure, such as a denied permission, still reaches PHP's own error handler.
+     */
+    private static function createProfilesDir(): void
+    {
+        set_error_handler(static fn(): bool => is_dir(self::$profilesDir));
+        mkdir(self::$profilesDir, recursive: true);
+        restore_error_handler();
+    }
+
+
+    /**
      * Generates a report from the profiling data and displays it in the console.
      *
-     * Times are in milliseconds and memory in kilobytes, summed over all runs. "Excl." is the
+     * Times are in milliseconds and memory changes in kilobytes, summed over all runs. "Excl." is the
      * function's own share, without the functions it called. The highest exclusive wall time is last.
-     *
-     * @throws JsonException If an error occurs during JSON decoding.
      *
      * @api
      *
@@ -117,7 +146,8 @@ final class Trace
             'Wall incl. (ms)',
             'Wall excl. (ms)',
             'CPU excl. (ms)',
-            'Memory excl. (KB)',
+            // xhprof records the change in memory, which is negative when a function frees more than it takes.
+            'Memory change excl. (KB)',
             'Runs',
         ]);
 
@@ -138,7 +168,7 @@ final class Trace
 
 
     /**
-     * Retrieves all profile JSON file paths from the profiles directory.
+     * Retrieves the paths of the profile files disableXhprof() saved in the profiles directory.
      *
      * @return array<int, string> An array of absolute file paths.
      *
@@ -146,7 +176,8 @@ final class Trace
      */
     private static function getAllProfileFiles(): array
     {
-        $files = glob(self::$profilesDir . '*.json', GLOB_NOSORT);
+        // Other JSON files in the same folder (a composer.json, say) are not profiles.
+        $files = glob(self::$profilesDir . '*.application.json', GLOB_NOSORT);
 
         return is_array($files) ? $files : [];
     }
@@ -158,8 +189,6 @@ final class Trace
      * @param array<int, string> $files
      *
      * @return array<string, array{ct: int, wt: int, excl_wt: int, excl_cpu: int, excl_mu: int, runs: int}>
-     *
-     * @throws JsonException
      */
     private static function getAggregatedDataFromFiles(array $files): array
     {
@@ -193,8 +222,6 @@ final class Trace
      * Generates a report from a single profiling data file.
      *
      * @return array<string, array{ct: int, wt: int, excl_wt: int, excl_cpu: int, excl_mu: int}>
-     *
-     * @throws JsonException
      */
     private static function generateReport(string $filename): array
     {
@@ -207,11 +234,16 @@ final class Trace
             return [];
         }
 
+        $data = json_decode($fileContents, true);
+
+        // A file holding "null" (saved by an older version) or cut off mid-write has nothing to report.
+        if (!is_array($data)) {
+            return [];
+        }
+
         /**
          * @var array<string, array{ct: int, wt: int, cpu: int, mu: int, pmu: int}> $data
          */
-        $data = json_decode($fileContents, true, flags: JSON_THROW_ON_ERROR);
-
         return self::processDataForReport($data);
     }
 
