@@ -41,7 +41,7 @@
   "minimum-stability": "dev",
   "prefer-stable": true,
   "require": {
-    "php": "^8.1|^8.2|^8.3",
+    "php": "^8.3",
     "ext-xhprof": "*",
     "symfony/console": "^v5|^v6|^v7"
   },
@@ -82,7 +82,7 @@
       "@test:rector"
     ],
     "test:code-style": "pint --test",
-    "test:infection": "infection --min-msi=100 --min-covered-msi=100 --threads=4 --show-mutations --only-covered --formatter=progress",
+    "test:infection": "infection --min-msi=100 --min-covered-msi=100 --threads=4 --show-mutations --formatter=progress",
     "test:lint": "parallel-lint --exclude vendor --show-deprecated .",
     "test:phan": "phan --analyze-twice --no-progress-bar",
     "test:phpmd": "phpmd src,tests text phpmd.xml",

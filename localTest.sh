@@ -5,7 +5,7 @@ set -euo pipefail
 mkdir -p "$HOME"/.composer/docker-cache
 
 # Loop through PHP versions to build Docker images and run Composer commands
-for version in {81..83}; do
+for version in {83..85}; do
   # Build Docker image for the current PHP version
   IMAGE_NAME="php-xprof-trace-composer-$version"
   docker build -t "$IMAGE_NAME" -f "docker/Dockerfile$version" .
@@ -18,8 +18,8 @@ for version in {81..83}; do
   DOCKER_CMD="docker run -it --rm -v $(pwd):/var/www -v $HOME/.composer/docker-cache:/root/.composer $IMAGE_NAME"
   $DOCKER_CMD composer --version
 
-  # Remove existing composer.lock, display Composer version, and run Composer install and update for PHP 8.1
-  if [ "$version" -eq 81 ]; then
+  # Remove existing composer.lock, display Composer version, and run Composer install and update for PHP 8.3
+  if [ "$version" -eq 83 ]; then
     rm -f composer.lock && \
     $DOCKER_CMD composer install && \
     $DOCKER_CMD composer update --with-all-dependencies && \

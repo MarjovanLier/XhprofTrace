@@ -1,0 +1,17 @@
+FROM php:8.4-cli-alpine
+
+# Install system dependencies; the build tools are only needed by pecl and are removed afterwards.
+# The upgrade applies Alpine security fixes that are newer than the base image.
+RUN set -eux; apk upgrade --no-cache \
+        && apk add --no-cache zip \
+        && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS linux-headers \
+        && pecl install ast xdebug xhprof \
+        && docker-php-ext-install pcntl \
+        && docker-php-ext-enable ast xdebug xhprof \
+        && apk del .build-deps \
+        && rm -rf /tmp/* /tmp/pear ~/.pearrc
+
+# Install Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www

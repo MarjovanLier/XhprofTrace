@@ -18,7 +18,7 @@ jobs:
         if: steps.checkout.outcome == 'success'
         uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.1"
+          php-version: "8.3"
           extensions: ast, pcntl, xdebug, xhprof
           coverage: xdebug
 

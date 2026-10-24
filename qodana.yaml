@@ -10,7 +10,7 @@ profile:
   name: qodana.recommended
 
 php:
-  version: 8.1 #(Applied in CI/CD pipeline)
+  version: 8.3 #(Applied in CI/CD pipeline)
 
 linter: jetbrains/qodana-php:latest
 include:
