@@ -18,7 +18,7 @@ RUN pecl install xhprof && docker-php-ext-enable xhprof
 ``` 
 
 ```bash
-composer require marjovanlier/xhproftrace
+composer require marjovanlier/xhprof-trace
 ```
 
 ## Usage
