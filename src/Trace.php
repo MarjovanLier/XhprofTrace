@@ -26,6 +26,17 @@ final class Trace
     ];
 
     /**
+     * Totals of a function before any of its calls are counted.
+     */
+    private const EMPTY_ROW = [
+        'ct' => 0,
+        'wt' => 0,
+        'excl_wt' => 0,
+        'excl_cpu' => 0,
+        'excl_mu' => 0,
+    ];
+
+    /**
      * Directory where profile data files are stored.
      */
     private static string $profilesDir = '/var/www/html/profiles/';
@@ -35,6 +46,8 @@ final class Trace
      * Sets the directory where profile data files are stored.
      *
      * @param string $path The path to the directory.
+     *
+     * @api
      *
      * @noinspection PhpUnused
      */
@@ -47,11 +60,14 @@ final class Trace
     /**
      * Enables XHProf profiling.
      *
+     * @api
+     *
      * @noinspection PhpUnused
      */
     public static function enableXhprof(): void
     {
-        xhprof_enable(XHPROF_FLAGS_NO_BUILTINS + XHPROF_FLAGS_MEMORY + XHPROF_FLAGS_CPU);
+        // Built-in functions stay in the profile, so time spent in a database or HTTP call is visible.
+        xhprof_enable(XHPROF_FLAGS_MEMORY + XHPROF_FLAGS_CPU);
     }
 
 
@@ -60,19 +76,30 @@ final class Trace
      *
      * @throws JsonException If an error occurs during JSON encoding.
      *
+     * @api
+     *
      * @noinspection PhpUnused
      */
     public static function disableXhprof(): void
     {
-        $filename = self::$profilesDir . time() . '.application.json';
-        file_put_contents($filename, json_encode(xhprof_disable(), JSON_THROW_ON_ERROR));
+        // Stop first, so the calls that build the file name are not in the profile.
+        $profile = xhprof_disable();
+
+        // The random part keeps two runs in the same second from writing to the same file.
+        $filename = self::$profilesDir . time() . '.' . bin2hex(random_bytes(8)) . '.application.json';
+        file_put_contents($filename, json_encode($profile, JSON_THROW_ON_ERROR));
     }
 
 
     /**
      * Generates a report from the profiling data and displays it in the console.
      *
+     * Times are in milliseconds and memory in kilobytes, summed over all runs. "Excl." is the
+     * function's own share, without the functions it called. The highest exclusive wall time is last.
+     *
      * @throws JsonException If an error occurs during JSON decoding.
+     *
+     * @api
      *
      * @noinspection PhpUnused
      */
@@ -84,10 +111,26 @@ final class Trace
 
         $consoleOutput = new ConsoleOutput();
         $table = new Table($consoleOutput);
-        $table->setHeaders(['Function', 'Score', 'Occurrences']);
+        $table->setHeaders([
+            'Function',
+            'Calls',
+            'Wall incl. (ms)',
+            'Wall excl. (ms)',
+            'CPU excl. (ms)',
+            'Memory excl. (KB)',
+            'Runs',
+        ]);
 
         foreach ($aggregatedData as $name => $data) {
-            $table->addRow([$name, $data['score'], $data['count']]);
+            $table->addRow([
+                $name,
+                $data['ct'],
+                number_format($data['wt'] / 1000, 2),
+                number_format($data['excl_wt'] / 1000, 2),
+                number_format($data['excl_cpu'] / 1000, 2),
+                number_format($data['excl_mu'] / 1024, 1),
+                $data['runs'],
+            ]);
         }
 
         $table->render();
@@ -110,44 +153,46 @@ final class Trace
 
 
     /**
-     * Aggregates data from multiple profiling data files.
+     * Sums the per-function totals of every profile and sorts them by exclusive wall time, highest last.
      *
      * @param array<int, string> $files
      *
-     * @return array<string, array{score: int, count: int}>
+     * @return array<string, array{ct: int, wt: int, excl_wt: int, excl_cpu: int, excl_mu: int, runs: int}>
      *
      * @throws JsonException
-     *
-     * @psalm-return array<string, array{count: int, score: int}>
      */
     private static function getAggregatedDataFromFiles(array $files): array
     {
-        $aggregatedScores = [];
-        $functionOccurrences = [];
+        $totals = [];
 
         foreach ($files as $file) {
-            foreach (self::generateReport($file) as $name => $score) {
-                $aggregatedScores[$name] = (($aggregatedScores[$name] ?? 0) + $score);
-                $functionOccurrences[$name] = (($functionOccurrences[$name] ?? 0) + 1);
+            foreach (self::generateReport($file) as $name => $row) {
+                $total = $totals[$name] ?? (self::EMPTY_ROW + ['runs' => 0]);
+                $totals[$name] = [
+                    'ct' => $total['ct'] + $row['ct'],
+                    'wt' => $total['wt'] + $row['wt'],
+                    'excl_wt' => $total['excl_wt'] + $row['excl_wt'],
+                    'excl_cpu' => $total['excl_cpu'] + $row['excl_cpu'],
+                    'excl_mu' => $total['excl_mu'] + $row['excl_mu'],
+                    'runs' => $total['runs'] + 1,
+                ];
             }
         }
 
-        $results = [];
-        foreach ($aggregatedScores as $name => $score) {
-            $results[$name] = [
-                'count' => ($functionOccurrences[$name] ?? 0),
-                'score' => (int) round($score / ($functionOccurrences[$name] ?? 1)),
-            ];
-        }
+        // The hottest functions end up last, just above the prompt.
+        uasort(
+            $totals,
+            static fn(array $first, array $second): int => $first['excl_wt'] <=> $second['excl_wt'],
+        );
 
-        return $results;
+        return $totals;
     }
 
 
     /**
      * Generates a report from a single profiling data file.
      *
-     * @return array<string, int>
+     * @return array<string, array{ct: int, wt: int, excl_wt: int, excl_cpu: int, excl_mu: int}>
      *
      * @throws JsonException
      */
@@ -163,49 +208,60 @@ final class Trace
         }
 
         /**
-         * @var array<string, array{ct: int, wt: int, cpu: int, mu: int, pmu: int, name: string}> $data
+         * @var array<string, array{ct: int, wt: int, cpu: int, mu: int, pmu: int}> $data
          */
-        $data = json_decode($fileContents, true, 512, JSON_THROW_ON_ERROR);
+        $data = json_decode($fileContents, true, flags: JSON_THROW_ON_ERROR);
 
         return self::processDataForReport($data);
     }
 
 
     /**
-     * Processes raw profiling data for report generation.
+     * Turns one profile into totals per function.
      *
-     * @param array<string, array{ct: int, wt: int, cpu: int, mu: int, pmu: int, name: string}> $data
+     * xhprof stores one entry per caller and callee pair, so a function called from several places
+     * is summed over all of them. Its exclusive ("excl_") figures are its inclusive figures minus
+     * those of every function it called.
      *
-     * @return array<string, int>
+     * @param array<string, array{ct: int, wt: int, cpu: int, mu: int, pmu: int}> $data
+     *
+     * @return array<string, array{ct: int, wt: int, excl_wt: int, excl_cpu: int, excl_mu: int}>
+     *
+     * @psalm-pure
      */
     private static function processDataForReport(array $data): array
     {
-        // This method is a refactored version of the original processing code to address cognitive complexity.
-        $filteredData = [];
+        $report = [];
+
         foreach ($data as $key => $values) {
+            // Every key is "caller==>callee" except the root, "main()", which has no caller.
             $parts = explode('==>', $key);
+            $callee = array_pop($parts);
+            $caller = array_pop($parts);
 
-            if (count($parts) !== 2) {
+            $report[$callee] ??= self::EMPTY_ROW;
+            $report[$callee]['ct'] += $values['ct'];
+            $report[$callee]['wt'] += $values['wt'];
+            $report[$callee]['excl_wt'] += $values['wt'];
+            $report[$callee]['excl_cpu'] += $values['cpu'];
+            $report[$callee]['excl_mu'] += $values['mu'];
+
+            if ($caller === null) {
                 continue;
             }
 
-            [
-                ,
-                $callee,
-            ] = $parts;
-
-            if (self::isExcludedClass($callee)) {
-                continue;
-            }
-
-            $values['name'] = $callee;
-            $filteredData[] = $values;
+            $report[$caller] ??= self::EMPTY_ROW;
+            $report[$caller]['excl_wt'] -= $values['wt'];
+            $report[$caller]['excl_cpu'] -= $values['cpu'];
+            $report[$caller]['excl_mu'] -= $values['mu'];
         }
 
-        $combinedRankings = self::computeCombinedRankings($filteredData);
-        asort($combinedRankings);
-
-        return $combinedRankings;
+        // Excluded functions are dropped only now, so their time is still taken off their callers.
+        return array_filter(
+            $report,
+            static fn(string $name): bool => !self::isExcludedClass($name),
+            ARRAY_FILTER_USE_KEY,
+        );
     }
 
 
@@ -215,6 +271,8 @@ final class Trace
      * @param string $functionName Name of the function.
      *
      * @return bool Whether the class should be excluded.
+     *
+     * @psalm-pure
      */
     private static function isExcludedClass(string $functionName): bool
     {
@@ -225,130 +283,5 @@ final class Trace
         }
 
         return false;
-    }
-
-
-    /**
-     * Computes a combined ranking for functions based on various XHProf metrics.
-     *
-     * The ranking is computed by first reversing the rank for each metric
-     * (except for 'ct') such that functions that perform better get higher ranks.
-     * Then, the combined rank is computed by summing the reversed ranks for
-     * each metric and multiplying by the call count (`ct`), emphasizing the
-     * importance of frequently called functions.
-     *
-     * Metrics used for ranking:
-     * 1. `wt`: Wall time – Total time (in microseconds) taken for both CPU and IO operations.
-     * 2. `cpu`: CPU time – Time (in microseconds) the CPU spent executing the function.
-     * 3. `mu`: Memory usage – Amount of memory (in bytes) used by the function.
-     * 4. `pmu`: Peak memory usage – Peak amount of memory (in bytes) used by the function.
-     *
-     * The call count `ct` is used as a multiplier to adjust the ranking based on the frequency
-     * of function calls.
-     *
-     * @param array<int, array{ct: int, wt: int, cpu: int, mu: int, pmu: int, name: string}> $filteredData
-     *
-     * @return array<string, int>
-     */
-    private static function computeCombinedRankings(array $filteredData): array
-    {
-        $rankingsByWt = self::rankByMetric($filteredData, 'wt');
-        $rankingsByCPU = self::rankByMetric($filteredData, 'cpu');
-        $rankingsByMemory = self::rankByMetric($filteredData, 'mu');
-        $rankingsByPeakMemory = self::rankByMetric($filteredData, 'pmu');
-
-        $combinedRankings = [];
-        $totalFunctions = count($filteredData);
-
-        foreach ($filteredData as $item) {
-            $name = $item['name'];
-            // Subtract each rank from totalFunctions + 1 to reverse the rank
-            $reversedRank = (
-                ($totalFunctions + 1 - ($rankingsByWt[$name] ?? 0)) +
-                ($totalFunctions + 1 - ($rankingsByCPU[$name] ?? 0)) +
-                ($totalFunctions + 1 - ($rankingsByMemory[$name] ?? 0)) +
-                ($totalFunctions + 1 - ($rankingsByPeakMemory[$name] ?? 0))
-            );
-
-            // Multiply the reversed rank by the call count
-            $combinedRankings[$name] = ($reversedRank * $item['ct']);
-        }
-
-        return $combinedRankings;
-    }
-
-
-    /**
-     * Ranks data by the specified metric.
-     *
-     * Given a multidimensional array of performance metrics, this function sorts
-     * and ranks the data based on the provided metric. The resulting array maps
-     * function names to their respective ranks.
-     *
-     * @param array<int, array{ct: int, wt: int, cpu: int, mu: int, pmu: int, name: string}> $data
-     *
-     * @return array<string, int> An associative array where keys are function names and values are their ranks.
-     */
-    private static function rankByMetric(array $data, string $metric): array
-    {
-        $comparisonFunction = static fn(
-            array $firstItem,
-            array $secondItem
-        ): int => ((int) $secondItem[$metric] - (int) $firstItem[$metric]);
-
-        usort($data, $comparisonFunction);
-
-        $rankings = [];
-        $previousMetricValue = null;
-        $currentRank = 1;
-        $sameMetricValueCount = 0;
-
-        foreach ($data as $item) {
-            // Abstracted the calculation of ranks into a separate function
-            [
-                $currentRank,
-                $sameMetricValueCount,
-                $previousMetricValue,
-            ] = self::calculateRank($item, $metric, $currentRank, $sameMetricValueCount, $previousMetricValue);
-            $rankings[$item['name']] = $currentRank;
-        }
-
-        return $rankings;
-    }
-
-
-    /**
-     * Calculates the rank for a given metric.
-     *
-     * @param array{ct: int, wt: int, cpu: int, mu: int, pmu: int, name: string} $item The array containing the metrics
-     *     and name for which the rank is calculated.
-     *
-     * @return array{int, int, int|string}
-     */
-    private static function calculateRank(
-        array $item,
-        string $metric,
-        int $currentRank,
-        int $sameMetricValueCount,
-        null|int|string $previousMetricValue
-    ): array {
-        if ($previousMetricValue === null || $item[$metric] === $previousMetricValue) {
-            ++$sameMetricValueCount;
-
-            return [
-                $currentRank,
-                $sameMetricValueCount,
-                $item[$metric],
-            ];
-        }
-
-        $currentRank += $sameMetricValueCount;
-        $sameMetricValueCount = 1;
-
-        return [
-            $currentRank,
-            $sameMetricValueCount,
-            $item[$metric],
-        ];
     }
 }

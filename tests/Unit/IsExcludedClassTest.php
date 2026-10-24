@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace tests\Unit;
 
 use MarjovanLier\XhprofTrace\Trace;
+use Override;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionException;
@@ -39,6 +40,7 @@ final class IsExcludedClassTest extends TestCase
     private ReflectionClass $reflectionClass;
 
 
+    #[Override]
     protected function setUp(): void
     {
         parent::setUp();
@@ -72,11 +74,6 @@ final class IsExcludedClassTest extends TestCase
     {
         // Get the 'isExcludedClass' method from the reflection
         $reflectionMethod = $this->reflectionClass->getMethod('isExcludedClass');
-
-        /**
-         * @psalm-suppress UnusedMethodCall
-         */
-        $reflectionMethod->setAccessible(true);
 
         // Invoke the method on a Trace object and pass the function name
         /**

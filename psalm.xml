@@ -20,16 +20,6 @@
     </plugins>
     <issueHandlers>
         <MissingParamType errorLevel="error"/>
-        <UnusedClass>
-            <errorLevel type="suppress">
-                <directory name="tests"/>
-            </errorLevel>
-        </UnusedClass>
         <ForbiddenCode errorLevel="error"/>
-        <PossiblyUnusedMethod>
-            <errorLevel type="suppress">
-                <directory name="src"/>
-            </errorLevel>
-        </PossiblyUnusedMethod>
     </issueHandlers>
 </psalm>

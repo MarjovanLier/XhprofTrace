@@ -46,7 +46,11 @@ The library provides the following static methods:
 
 - `enableXhprof()`: Enables XHProf profiling.
 - `disableXhprof()`: Disables XHProf profiling and saves the profiling data to a file.
-- `displayReportCLI()`: Generates a report from the profiling data and displays it in the console.
+- `displayReportCLI()`: Displays a table of every profiled function, summed over all saved runs: the number of
+  calls, the inclusive and exclusive wall time and the exclusive CPU time in milliseconds, the exclusive memory in
+  kilobytes, and the number of runs. "Exclusive" is the function's own share, without the functions it called. The
+  function with the highest exclusive wall time is the last row. A recursive function keeps the names xhprof gives
+  each depth (`fib`, `fib@1`, `fib@2`), so it has one row per depth.
 
 ## License
 
