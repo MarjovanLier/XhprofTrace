@@ -57,7 +57,7 @@ return static function (RectorConfig $rectorConfig): void {
             SetList::PRIVATIZATION,
             SetList::STRICT_BOOLEANS,
             SetList::INSTANCEOF,
-        ]
+        ],
     );
 
     $rectorConfig->importNames();
@@ -66,6 +66,6 @@ return static function (RectorConfig $rectorConfig): void {
     $rectorConfig->skip(
         [
             FlipTypeControlToUseExclusiveTypeRector::class,
-        ]
+        ],
     );
 };
