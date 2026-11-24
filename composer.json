@@ -23,7 +23,7 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "MarjovanLier\\XhprofTrace\\Tests\\Unit\\": "tests"
+      "MarjovanLier\\XhprofTrace\\Tests\\": "tests"
     }
   },
   "config": {

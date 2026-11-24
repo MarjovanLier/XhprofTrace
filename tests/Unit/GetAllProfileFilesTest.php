@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace tests\Unit;
+namespace MarjovanLier\XhprofTrace\Tests\Unit;
 
 use MarjovanLier\XhprofTrace\Trace;
 use Override;
