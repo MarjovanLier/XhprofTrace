@@ -55,9 +55,9 @@ final class Trace
     public static function setProfilesDir(string $path): void
     {
         // The file name is appended to this path, so without a closing slash it would land beside the folder.
+        // A path that already ends in a slash gets a second one, which the filesystem reads as one.
         self::$profilesDir = match (true) {
             $path === '' => './',
-            str_ends_with($path, '/') => $path,
             default => $path . '/',
         };
     }
