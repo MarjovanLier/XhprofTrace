@@ -6,16 +6,16 @@ namespace tests\Unit;
 
 use MarjovanLier\XhprofTrace\Trace;
 use Override;
+use PHPUnit\Framework\Attributes\CoversMethod;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionException;
 
 /**
  * @internal
- *
- * @covers \MarjovanLier\XhprofTrace\Trace::getAllProfileFiles
- * @covers \MarjovanLier\XhprofTrace\Trace::setProfilesDir
  */
+#[CoversMethod(Trace::class, 'getAllProfileFiles')]
+#[CoversMethod(Trace::class, 'setProfilesDir')]
 final class GetAllProfileFilesTest extends TestCase
 {
     private string $profilesDir;

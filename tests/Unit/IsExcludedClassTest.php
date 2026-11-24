@@ -6,15 +6,15 @@ namespace tests\Unit;
 
 use MarjovanLier\XhprofTrace\Trace;
 use Override;
+use PHPUnit\Framework\Attributes\CoversMethod;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionException;
 
 /**
  * @internal
- *
- * @covers \MarjovanLier\XhprofTrace\Trace::isExcludedClass
  */
+#[CoversMethod(Trace::class, 'isExcludedClass')]
 final class IsExcludedClassTest extends TestCase
 {
     /**

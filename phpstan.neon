@@ -1,8 +1,6 @@
 parameters:
     level: max
     phpVersion: 80100
-    checkMissingIterableValueType: true
-    checkGenericClassInNonGenericObjectType: true
     treatPhpDocTypesAsCertain: false
     tipsOfTheDay: false
     reportWrongPhpDocTypeInVarTag: true

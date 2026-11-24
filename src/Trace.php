@@ -268,8 +268,8 @@ final class Trace
         foreach ($data as $key => $values) {
             // Every key is "caller==>callee" except the root, "main()", which has no caller.
             $parts = explode('==>', $key);
-            $callee = array_pop($parts);
-            $caller = array_pop($parts);
+            $callee = $parts[count($parts) - 1];
+            $caller = $parts[count($parts) - 2] ?? null;
 
             $report[$callee] ??= self::EMPTY_ROW;
             $report[$callee]['ct'] += $values['ct'];

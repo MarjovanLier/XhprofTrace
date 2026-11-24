@@ -7,6 +7,7 @@ namespace tests\Unit;
 use JsonException;
 use MarjovanLier\XhprofTrace\Trace;
 use Override;
+use PHPUnit\Framework\Attributes\CoversMethod;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionException;
@@ -15,12 +16,11 @@ use ReflectionException;
  * Runs the real xhprof extension, so it needs ext-xhprof loaded.
  *
  * @internal
- *
- * @covers \MarjovanLier\XhprofTrace\Trace::createProfilesDir
- * @covers \MarjovanLier\XhprofTrace\Trace::disableXhprof
- * @covers \MarjovanLier\XhprofTrace\Trace::enableXhprof
- * @covers \MarjovanLier\XhprofTrace\Trace::setProfilesDir
  */
+#[CoversMethod(Trace::class, 'createProfilesDir')]
+#[CoversMethod(Trace::class, 'disableXhprof')]
+#[CoversMethod(Trace::class, 'enableXhprof')]
+#[CoversMethod(Trace::class, 'setProfilesDir')]
 final class ProfileCaptureTest extends TestCase
 {
     private string $profilesDir;
