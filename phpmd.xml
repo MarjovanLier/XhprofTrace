@@ -10,7 +10,10 @@
     <rule ref="rulesets/unusedcode.xml"/>
     <rule ref="rulesets/codesize.xml"/>
     <rule ref="rulesets/design.xml"/>
-    <rule ref="rulesets/naming.xml"/>
+    <!-- PHPMD 3 added LongMethodName; test names describe the behaviour they check and run past its 40-character limit. -->
+    <rule ref="rulesets/naming.xml">
+        <exclude name="LongMethodName"/>
+    </rule>
     <rule ref="rulesets/cleancode.xml">
         <exclude name="StaticAccess"/>
     </rule>

@@ -43,7 +43,7 @@
   "require": {
     "php": "^8.3",
     "ext-xhprof": "*",
-    "symfony/console": "^v5|^v6|^v7"
+    "symfony/console": "^v5|^v6|^v7|^v8"
   },
   "require-dev": {
     "ext-ast": "*",
@@ -55,11 +55,11 @@
     "phan/phan": ">=5.4.3",
     "php-parallel-lint/php-console-highlighter": "^1",
     "php-parallel-lint/php-parallel-lint": "^1",
-    "phpmd/phpmd": "^2",
-    "phpstan/phpstan": "^1.10",
-    "phpstan/phpstan-phpunit": "^1.3",
-    "phpunit/php-code-coverage": "^10|^11",
-    "phpunit/phpunit": "^10|^11",
+    "phpmd/phpmd": "^3",
+    "phpstan/phpstan": "^2",
+    "phpstan/phpstan-phpunit": "^2",
+    "phpunit/php-code-coverage": "^12|^13|^14",
+    "phpunit/phpunit": "^12|^13",
     "psalm/plugin-phpunit": ">=0.18.4",
     "rector/rector": ">=1.0.2",
     "vimeo/psalm": ">=5.22.2"
@@ -85,7 +85,7 @@
     "test:infection": "infection --min-msi=100 --min-covered-msi=100 --threads=4 --show-mutations --formatter=progress",
     "test:lint": "parallel-lint --exclude vendor --show-deprecated .",
     "test:phan": "phan --analyze-twice --no-progress-bar",
-    "test:phpmd": "phpmd src,tests text phpmd.xml",
+    "test:phpmd": "phpmd analyze src tests --format text --ruleset phpmd.xml",
     "test:phpstan": "php -d memory_limit=-1 ./vendor/bin/phpstan analyse --no-progress --no-interaction",
     "test:phpunit": "phpunit --no-coverage --no-logging",
     "test:psalm": "psalm --no-cache --no-progress --show-info=false",

@@ -7,16 +7,16 @@ namespace tests\Unit;
 use JsonException;
 use MarjovanLier\XhprofTrace\Trace;
 use Override;
+use PHPUnit\Framework\Attributes\CoversMethod;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionException;
 
 /**
  * @internal
- *
- * @covers \MarjovanLier\XhprofTrace\Trace::generateReport
- * @covers \MarjovanLier\XhprofTrace\Trace::getAggregatedDataFromFiles
  */
+#[CoversMethod(Trace::class, 'generateReport')]
+#[CoversMethod(Trace::class, 'getAggregatedDataFromFiles')]
 final class GetAggregatedDataFromFilesTest extends TestCase
 {
     /**

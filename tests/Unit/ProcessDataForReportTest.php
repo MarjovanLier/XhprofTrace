@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace tests\Unit;
 
 use MarjovanLier\XhprofTrace\Trace;
+use PHPUnit\Framework\Attributes\CoversMethod;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionException;
 
 /**
  * @internal
- *
- * @covers \MarjovanLier\XhprofTrace\Trace::processDataForReport
  */
+#[CoversMethod(Trace::class, 'processDataForReport')]
 final class ProcessDataForReportTest extends TestCase
 {
     /**

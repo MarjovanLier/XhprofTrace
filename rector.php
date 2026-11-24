@@ -55,7 +55,6 @@ return static function (RectorConfig $rectorConfig): void {
             SetList::TYPE_DECLARATION,
             SetList::NAMING,
             SetList::PRIVATIZATION,
-            SetList::STRICT_BOOLEANS,
             SetList::INSTANCEOF,
         ],
     );
