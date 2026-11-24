@@ -7,6 +7,7 @@ namespace MarjovanLier\XhprofTrace;
 use JsonException;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Output\ConsoleOutput;
+use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * This class provides methods for enabling and disabling XHProf, a hierarchical profiler for PHP.
@@ -128,18 +129,19 @@ final class Trace
      * Times are in milliseconds and memory changes in kilobytes, summed over all runs. "Excl." is the
      * function's own share, without the functions it called. The highest exclusive wall time is last.
      *
+     * @param OutputInterface $output Where the table is written, such as a command's output; the console by default.
+     *
      * @api
      *
      * @noinspection PhpUnused
      */
-    public static function displayReportCLI(): void
+    public static function displayReportCLI(OutputInterface $output = new ConsoleOutput()): void
     {
         $files = self::getAllProfileFiles();
 
         $aggregatedData = self::getAggregatedDataFromFiles($files);
 
-        $consoleOutput = new ConsoleOutput();
-        $table = new Table($consoleOutput);
+        $table = new Table($output);
         $table->setHeaders([
             'Function',
             'Calls',
