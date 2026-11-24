@@ -38,6 +38,13 @@ final class Trace
     ];
 
     /**
+     * End of the name of every profile file disableXhprof() saves; the report reads only files with this ending.
+     *
+     * Changing it leaves the files users already saved out of their reports.
+     */
+    private const PROFILE_FILE_SUFFIX = '.application.json';
+
+    /**
      * Directory where profile data files are stored.
      */
     private static string $profilesDir = '/var/www/html/profiles/';
@@ -103,7 +110,7 @@ final class Trace
         }
 
         // The random part keeps two runs in the same second from writing to the same file.
-        $filename = self::$profilesDir . time() . '.' . bin2hex(random_bytes(8)) . '.application.json';
+        $filename = self::$profilesDir . time() . '.' . bin2hex(random_bytes(8)) . self::PROFILE_FILE_SUFFIX;
         file_put_contents($filename, json_encode($profile, JSON_THROW_ON_ERROR));
     }
 
@@ -179,7 +186,7 @@ final class Trace
     private static function getAllProfileFiles(): array
     {
         // Other JSON files in the same folder (a composer.json, say) are not profiles.
-        $files = glob(self::$profilesDir . '*.application.json', GLOB_NOSORT);
+        $files = glob(self::$profilesDir . '*' . self::PROFILE_FILE_SUFFIX, GLOB_NOSORT);
 
         return is_array($files) ? $files : [];
     }
